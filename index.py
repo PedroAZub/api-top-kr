@@ -39,7 +39,7 @@ def catch_all(path):
             
             if match:
                 rank_kr = match.group(1)
-                return Response(f"Rank KR: #{rank_kr}", mimetype='text/plain')
+                return Response(f"O Rank do Ayu na KR é: #{rank_kr}", mimetype='text/plain')
             
             # Se não achou KR, vê se tem apenas o Rank Global
             # Ex: Rank: 345
