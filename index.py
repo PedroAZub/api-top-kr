@@ -5,44 +5,41 @@ import re
 
 app = Flask(__name__)
 
-# Essa rota captura qualquer coisa que vier na URL
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def catch_all(path):
     url = "https://www.leagueofgraphs.com/summoner/kr/FURIA+Ayu-1103"
-    scraper = cloudscraper.create_scraper()
+    
+    # Tenta usar um navegador Desktop Windows para enganar melhor
+    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
     
     try:
         response = scraper.get(url)
         
-        if "Just a moment" in response.text:
-            return Response("Bot bloqueado (Cloudflare).", mimetype='text/plain')
-
+        # Cria o objeto soup
         soup = BeautifulSoup(response.text, 'html.parser')
-
-        # Busca a caixa de rank
-        rank_div = soup.find("div", class_="league-rank")
         
-        if rank_div:
-            texto_completo = rank_div.get_text().strip()
-            # O texto vem assim: "Rank: 345 (KR: 95)"
-            # O Regex abaixo ignora o 345 e pega só o 95 dentro do parenteses
-            match = re.search(r'\(KR:\s*([\d,]+)\)', texto_completo)
+        # --- ESTRATÉGIA DE FORÇA BRUTA ---
+        # Pega TODO o texto da página, ignorando HTML tags
+        texto_pagina = soup.get_text()
+        
+        # Procura pelo padrão "(KR: numero)" em qualquer lugar do texto
+        match = re.search(r'\(KR:\s*([\d,]+)\)', texto_pagina)
+        
+        if match:
+            rank_kr = match.group(1)
+            return Response(f"FURIA Ayu: Rank #{rank_kr} (KR)", mimetype='text/plain')
             
-            if match:
-                rank_kr = match.group(1)
-                return Response(f"FURIA Ayu: Rank #{rank_kr} (KR)", mimetype='text/plain')
-            
-            # Se não achar o KR, tenta limpar o texto e mandar o que achou
-            return Response(f"FURIA Ayu: {texto_completo}", mimetype='text/plain')
-            
-        # Fallback (caso ele caia pra GM ou Mestre)
-        tier = soup.find("div", class_="league-tier-name")
-        lp = soup.find("div", class_="league-points")
-        if tier and lp:
-            return Response(f"FURIA Ayu: {tier.get_text().strip()} - {lp.get_text().strip()}", mimetype='text/plain')
-
-        return Response("Rank não encontrado.", mimetype='text/plain')
+        # --- SE FALHAR, DEBUGAR ---
+        # Vamos descobrir o que o bot está vendo
+        titulo_pagina = soup.title.string if soup.title else "Sem Título"
+        
+        # Checa se achou pelo menos o elo (Challenger/Grandmaster)
+        if "Challenger" in texto_pagina:
+             return Response(f"Achei 'Challenger' no texto, mas não o número do rank (KR). Título: {titulo_pagina}", mimetype='text/plain')
+             
+        # Se não achou nada, devolve o título da página para sabermos se foi bloqueio
+        return Response(f"Erro: Rank não achado. O site carregou com o título: '{titulo_pagina}'", mimetype='text/plain')
 
     except Exception as e:
-        return Response(f"Erro: {str(e)}", mimetype='text/plain')
+        return Response(f"Erro interno: {str(e)}", mimetype='text/plain')
