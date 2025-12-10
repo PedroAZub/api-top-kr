@@ -1,5 +1,5 @@
 from flask import Flask
-import requests
+import cloudscraper # Biblioteca nova para passar pela proteção
 from bs4 import BeautifulSoup
 import os
 
@@ -7,38 +7,47 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot Online! Use /rank para ver o elo."
+    return "Bot Online! Use /rank"
 
 @app.route('/rank')
 def get_rank_scraping():
-    # URL do perfil do Ayu (pode mudar se ele trocar de nick)
     url = "https://www.leagueofgraphs.com/summoner/kr/FURIA+Ayu-1103"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+    
+    # O cloudscraper cria um navegador fake mais convincente
+    scraper = cloudscraper.create_scraper() 
     
     try:
-        response = requests.get(url, headers=headers)
-        if response.status_code != 200: return "Erro ao acessar site."
+        response = scraper.get(url)
         
+        # Debug: Se o titulo da pagina for 'Just a moment...', fomos bloqueados
+        if "Just a moment" in response.text:
+            return "O site bloqueou o bot (Cloudflare). Tente mais tarde."
+
         soup = BeautifulSoup(response.text, 'html.parser')
-        
+
         # Tenta achar a posição exata (Ladder Rank)
         rank_div = soup.find("div", class_="league-rank")
         if rank_div:
-            return f"FURIA Ayu (KR): {rank_div.get_text().strip()}"
+            # Limpa o texto (remove quebras de linha e espaços extras)
+            rank_limpo = " ".join(rank_div.get_text().split())
+            return f"FURIA Ayu (KR): {rank_limpo}"
             
-        # Fallback para Elo + PDL
+        # Fallback: Tenta achar o Elo e PDL
         tier_div = soup.find("div", class_="league-tier-name")
         lp_div = soup.find("div", class_="league-points")
+        
         if tier_div and lp_div:
-            return f"FURIA Ayu (KR): {tier_div.get_text().strip()} - {lp_div.get_text().strip()}"
+            tier = tier_div.get_text().strip()
+            lp = lp_div.get_text().strip()
+            return f"FURIA Ayu (KR): {tier} - {lp}"
             
-        return "Rank não encontrado (Unranked?)"
+        # Se chegou aqui, printa o titulo da pagina para entender o erro
+        page_title = soup.find("title").get_text() if soup.find("title") else "Sem titulo"
+        return f"Não achei o rank. O site retornou a página: '{page_title}'"
+
     except Exception as e:
-        return f"Erro: {str(e)}"
+        return f"Erro interno: {str(e)}"
 
 if __name__ == '__main__':
-    # Isso é só para testar no seu PC se quiser
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
