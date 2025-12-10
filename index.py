@@ -51,7 +51,7 @@ def catch_all(path):
         full_text = soup.get_text()
         match_brute = re.search(r'\(KR:?\s*#?([\d,]+)\)', full_text)
         if match_brute:
-            return Response(f"Rank KR: #{match_brute.group(1)}", mimetype='text/plain')
+            return Response(f"O Rank do Ayu na KR é: #{match_brute.group(1)}", mimetype='text/plain')
 
         return Response("Rank KR não encontrado na página (Pode ter caído do Top Ladder).", mimetype='text/plain')
 
